@@ -7,5 +7,9 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "taevas",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "debug": "^4.3.4",
+    "sleep-promise": "^9.1.0"
+  }
 }

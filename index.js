@@ -1,14 +1,22 @@
 'use strict';
+const sleep = require('sleep-promise');
+const debug = require('debug')('throat');
 
-function throatInternal(size) {
+function throatInternal(size, ms) {
   var queue = new Queue();
   var s = size | 0;
+  var followIndex = 0;
+  var followTime = new Array(size);
 
   function run(fn, self, args) {
     if ((s | 0) !== 0) {
       s = (s | 0) - 1;
-      return new Promise(function (resolve) {
-        resolve(fn.apply(self, args));
+      const time = sleepTime();
+      debug('run function after %s ms', time);
+      return sleep(time).then(() => {
+        return new Promise(function (resolve) {
+          resolve(fn.apply(self, args));
+        })
       }).then(onFulfill, onReject);
     }
     return new Promise(function (resolve) {
@@ -16,14 +24,13 @@ function throatInternal(size) {
     }).then(runDelayed);
   }
   function runDelayed(d) {
-    try {
-      return Promise.resolve(d.fn.apply(d.self, d.args)).then(
-        onFulfill,
-        onReject
-      );
-    } catch (ex) {
-      onReject(ex);
-    }
+    const time = sleepTime();
+    debug('run delay function after %s ms', time);
+    return sleep(time).then(() => {
+      return new Promise(function (resolve) {
+        resolve(d.fn.apply(d.self, d.args));
+      })
+    }).then(onFulfill, onReject);
   }
   function onFulfill(result) {
     release();
@@ -42,11 +49,24 @@ function throatInternal(size) {
     }
   }
 
+  function sleepTime() {
+    const now = new Date().getTime();
+    let diffTime = ms - (now - (followTime[followIndex] || 0));
+    diffTime = diffTime >= 0 ? diffTime : 0;
+
+    followTime[followIndex] = now + diffTime;
+    if (++followIndex === size) {
+      followIndex = 0;
+    }
+
+    return diffTime;
+  }
+
   return run;
 }
 
-function earlyBound(size, fn) {
-  const run = throatInternal(size | 0);
+function earlyBound(size, ms, fn) {
+  const run = throatInternal(size | 0, ms);
   return function () {
     var args = new Array(arguments.length);
     for (var i = 0; i < arguments.length; i++) {
@@ -55,8 +75,8 @@ function earlyBound(size, fn) {
     return run(fn, this, args);
   };
 }
-function lateBound(size) {
-  const run = throatInternal(size | 0);
+function lateBound(size, ms) {
+  const run = throatInternal(size | 0, ms);
   return function (fn) {
     if (typeof fn !== 'function') {
       throw new TypeError(
@@ -70,26 +90,28 @@ function lateBound(size) {
     return run(fn, this, args);
   };
 }
-module.exports = function throat(size, fn) {
-  if (typeof size === 'function') {
-    var temp = fn;
-    fn = size;
-    size = temp;
-  }
+module.exports = function throat(size, ms, fn) {
   if (typeof size !== 'number') {
     throw new TypeError(
       'Expected throat size to be a number but got ' + typeof size
     );
   }
+
+  if (typeof ms !== 'number') {
+    throw new TypeError(
+      'Expected throat ms to be a number but got ' + typeof ms
+    );
+  }
+
   if (fn !== undefined && typeof fn !== 'function') {
     throw new TypeError(
       'Expected throat fn to be a function but got ' + typeof fn
     );
   }
   if (typeof fn === 'function') {
-    return earlyBound(size | 0, fn);
+    return earlyBound(size | 0, ms, fn);
   } else {
-    return lateBound(size | 0);
+    return lateBound(size | 0, ms);
   }
 };
 
