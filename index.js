@@ -12,7 +12,7 @@ function throatInternal(size, ms) {
     if ((s | 0) !== 0) {
       s = (s | 0) - 1;
       const time = sleepTime();
-      debug('run function after %s ms', time);
+      debug('run function "%s" after %s ms', fn.name, time);
       return sleep(time).then(() => {
         return new Promise(function (resolve) {
           resolve(fn.apply(self, args));
@@ -25,7 +25,7 @@ function throatInternal(size, ms) {
   }
   function runDelayed(d) {
     const time = sleepTime();
-    debug('run delay function after %s ms', time);
+    debug('run delay function "%s" after %s ms', d.fn.name, time);
     return sleep(time).then(() => {
       return new Promise(function (resolve) {
         resolve(d.fn.apply(d.self, d.args));
